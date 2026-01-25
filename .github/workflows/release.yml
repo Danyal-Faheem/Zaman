@@ -1,0 +1,53 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Build Archive
+        run: |
+          xcodebuild archive \
+            -project Zaman.xcodeproj \
+            -scheme Zaman \
+            -archivePath ./build/Zaman.xcarchive \
+            -configuration Release \
+            CODE_SIGN_IDENTITY="-" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Export App
+        run: |
+          xcodebuild -exportArchive \
+            -archivePath ./build/Zaman.xcarchive \
+            -exportPath ./build \
+            -exportOptionsPlist .github/workflows/ExportOptions.plist
+
+      - name: Create ZIP
+        run: |
+          cd build
+          zip -r Zaman.zip Zaman.app
+          shasum -a 256 Zaman.zip
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: build/Zaman.zip
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

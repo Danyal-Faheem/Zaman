@@ -8,14 +8,10 @@
 import SwiftUI
 
 struct ContentView: View {
+    @StateObject private var viewModel = PrayerTimesViewModel()
+    
     var body: some View {
-        VStack {
-            Image(systemName: "globe")
-                .imageScale(.large)
-                .foregroundStyle(.tint)
-            Text("Hello, world!")
-        }
-        .padding()
+        MenuBarPopupView(viewModel: viewModel)
     }
 }
 

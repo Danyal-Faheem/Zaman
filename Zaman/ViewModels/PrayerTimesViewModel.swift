@@ -91,7 +91,9 @@ class PrayerTimesViewModel: ObservableObject {
     
     private var cancellables = Set<AnyCancellable>()
     private var timer: Timer?
+    private var midnightTimer: Timer?
     private var isChangingLocation = false
+    private var lastRefreshDate: Date?
     
     // MARK: - Constants
     private let countdownThreshold: TimeInterval = 15 * 60 // 15 minutes
@@ -101,11 +103,15 @@ class PrayerTimesViewModel: ObservableObject {
         startTimer()
         setupSettingsObservers()
         setupLocationObserver()
+        setupMidnightTimer()
+        setupSystemWakeObserver()
     }
     
     deinit {
         timer?.invalidate()
+        midnightTimer?.invalidate()
         cancellables.removeAll()
+        NotificationCenter.default.removeObserver(self)
     }
     
     // MARK: - Settings Observers
@@ -175,11 +181,91 @@ class PrayerTimesViewModel: ObservableObject {
         // Update every second
         timer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
             Task { @MainActor in
+                self?.checkAndRefreshIfNeeded()
                 self?.updateUpcomingEvent()
                 self?.updateMenuBarTitle()
             }
         }
         timer?.tolerance = 0.1
+    }
+    
+    // MARK: - Midnight Timer
+    private func setupMidnightTimer() {
+        scheduleMidnightTimer()
+    }
+    
+    private func scheduleMidnightTimer() {
+        // Calculate time until next midnight
+        let calendar = Calendar.current
+        let now = Date()
+        
+        guard let midnight = calendar.nextDate(after: now,
+                                               matching: DateComponents(hour: 0, minute: 0),
+                                               matchingPolicy: .nextTime) else {
+            return
+        }
+        
+        let timeInterval = midnight.timeIntervalSince(now)
+        
+        // Schedule timer to fire at midnight
+        midnightTimer?.invalidate()
+        midnightTimer = Timer.scheduledTimer(withTimeInterval: timeInterval, repeats: false) { [weak self] _ in
+            Task { @MainActor in
+                await self?.refreshAtMidnight()
+            }
+        }
+    }
+    
+    private func refreshAtMidnight() async {
+        print("Midnight refresh triggered")
+        await fetchPrayerTimes()
+        // Schedule next midnight timer
+        scheduleMidnightTimer()
+    }
+    
+    // MARK: - System Wake Observer
+    private func setupSystemWakeObserver() {
+        // Observe when system wakes from sleep
+        NotificationCenter.default.addObserver(
+            forName: NSWorkspace.didWakeNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                await self?.handleSystemWake()
+            }
+        }
+        
+        // Observe when app becomes active
+        NotificationCenter.default.addObserver(
+            forName: NSApplication.didBecomeActiveNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                await self?.handleAppBecomeActive()
+            }
+        }
+    }
+    
+    private func handleSystemWake() async {
+        print("System wake detected")
+        await checkAndRefreshIfNeeded(force: true)
+    }
+    
+    private func handleAppBecomeActive() async {
+        await checkAndRefreshIfNeeded()
+    }
+    
+    private func checkAndRefreshIfNeeded(force: Bool = false) async {
+        let calendar = Calendar.current
+        let now = Date()
+        
+        // Check if we need to refresh (new day or forced)
+        if force || lastRefreshDate == nil || !calendar.isDate(now, inSameDayAs: lastRefreshDate ?? .distantPast) {
+            print("Refreshing prayer times for new day")
+            await fetchPrayerTimes()
+        }
     }
     
     // MARK: - Data Loading
@@ -238,6 +324,9 @@ class PrayerTimesViewModel: ObservableObject {
             
             prayerTimes = result.prayerTimes
             currentHijriDate = result.hijriDate
+            
+            // Track last refresh date
+            lastRefreshDate = Date()
             
             // Update settings
             settings.selectLocation(countryCode: city.countryCode, cityName: city.name)

@@ -140,7 +140,7 @@ Access via the gear icon:
 
 If you find Zaman useful, consider supporting its development:
 
-<a href="https://www.buymeacoffee.com/yourusername" target="_blank">
+<a href="https://www.buymeacoffee.com/danyalfaheem" target="_blank">
   <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" height="60">
 </a>
 

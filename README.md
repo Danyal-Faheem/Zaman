@@ -129,11 +129,9 @@ Access via the gear icon:
 
 - [ ] Custom Iqama time adjustments
 - [ ] Multiple calculation methods support
-- [ ] Qibla direction indicator
 - [ ] Widget support
 - [ ] Prayer time history
 - [ ] Multiple location bookmarks
-- [ ] Custom notification sounds
 - [ ] Export prayer times to calendar
 
 ## 🤝 Support This Project

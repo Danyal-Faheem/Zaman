@@ -491,7 +491,7 @@ class PrayerTimesViewModel: ObservableObject {
             
             if isEnabled {
                 let timeString = upcoming.formattedTimeRemaining(from: now)
-                menuBarTitle = "\(prayer.rawValue) \(eventType) in \(timeString)"
+                menuBarTitle = "\(timeString): \(prayer.rawValue) \(eventType)"
             } else {
                 menuBarTitle = ""
             }

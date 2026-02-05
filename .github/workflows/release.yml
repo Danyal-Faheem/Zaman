@@ -5,51 +5,74 @@ on:
     tags:
       - "v*"
 
-permissions:
-  contents: write
-
 jobs:
   build:
     runs-on: macos-latest
+
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Xcode
+      - name: Set up Xcode
         uses: maxim-lobanov/setup-xcode@v1
         with:
           xcode-version: latest-stable
 
-      - name: Build Archive
+      - name: Build app
         run: |
-          xcodebuild archive \
-            -project Zaman.xcodeproj \
-            -scheme Zaman \
-            -archivePath ./build/Zaman.xcarchive \
-            -configuration Release \
-            CODE_SIGN_IDENTITY="-" \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGNING_ALLOWED=NO
+          xcodebuild -scheme Zaman -configuration Release -derivedDataPath build clean build
 
-      - name: Export App
+      - name: Create DMG
         run: |
-          xcodebuild -exportArchive \
-            -archivePath ./build/Zaman.xcarchive \
-            -exportPath ./build \
-            -exportOptionsPlist .github/workflows/ExportOptions.plist
+          # Create a temporary directory for DMG contents
+          mkdir -p dmg_temp
 
-      - name: Create ZIP
+          # Copy the app to temp directory
+          cp -R build/Build/Products/Release/Zaman.app dmg_temp/
+
+          # Create Applications symlink for easy installation
+          ln -s /Applications dmg_temp/Applications
+
+          # Create DMG
+          hdiutil create -volname "Zaman" -srcfolder dmg_temp -ov -format UDZO Zaman.dmg
+
+      - name: Calculate SHA256
+        id: sha256
         run: |
-          cd build
-          zip -r Zaman.zip Zaman.app
-          shasum -a 256 Zaman.zip
+          SHA256=$(shasum -a 256 Zaman.dmg | awk '{print $1}')
+          echo "sha256=$SHA256" >> $GITHUB_OUTPUT
+          echo "SHA256: $SHA256"
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
-          files: build/Zaman.zip
-          generate_release_notes: true
+          files: Zaman.dmg
+          body: |
+            ## Zaman ${{ github.ref_name }}
+
+            Islamic prayer times in your macOS menu bar.
+
+            ### Installation
+            1. Download `Zaman.dmg`
+            2. Open the DMG file
+            3. Drag Zaman.app to Applications folder
+            4. Launch Zaman from Applications
+
+            ### SHA256
+            ```
+            ${{ steps.sha256.outputs.sha256 }}
+            ```
+
+            ### Features
+            - 🕌 Menu bar prayer times
+            - 🌍 150+ cities worldwide
+            - 📍 Auto-detect location
+            - 🔔 Adhan & Iqama notifications
+            - 🌙 Hijri calendar
+            - 🌓 Light & dark mode support
           draft: false
           prerelease: false
         env:
